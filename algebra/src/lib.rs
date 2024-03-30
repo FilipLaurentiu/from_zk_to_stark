@@ -1,4 +1,5 @@
-mod finite_field;
+pub mod finite_field;
+pub mod polynomial;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
