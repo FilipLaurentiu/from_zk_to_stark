@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub, Mul, Div, Neg};
 
-pub type FieldSize = i128;
+pub type FieldSize = i32;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct FieldElement<'a> {
