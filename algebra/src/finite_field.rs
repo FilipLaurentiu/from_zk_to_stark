@@ -3,18 +3,28 @@ use std::ops::{Add, Sub, Mul, Div, Neg};
 
 pub type FieldSize = i32;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct FieldElement<'a> {
     element: FieldSize,
     finite_field: &'a FiniteField,
 }
 
+impl<'a> PartialEq for FieldElement<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.finite_field.prime != other.finite_field.prime {
+            false
+        } else {
+            self.element % self.finite_field.prime == other.element % self.finite_field.prime
+        }
+    }
+}
+
 impl<'a> Display for FieldElement<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.element.is_positive() {
-            write!(f, "{} mod {}", self.element, self.finite_field.prime)
+            write!(f, "{}", self.element % self.finite_field.prime)
         } else {
-            write!(f, "{} mod {}", self.finite_field.prime - self.element, self.finite_field.prime)
+            write!(f, "{}", self.finite_field.prime - self.element)
         }
     }
 }
@@ -72,7 +82,7 @@ impl<'a> Neg for FieldElement<'a> {
 
     fn neg(self) -> Self::Output {
         Self {
-            element: self.finite_field.prime - self.element,
+            element: (self.finite_field.prime - self.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
     }
@@ -96,7 +106,7 @@ impl<'a> FieldElement<'a> {
 #[derive(PartialEq, Debug)]
 pub struct FiniteField {
     pub prime: FieldSize,
-    pub generator: FieldSize
+    pub generator: FieldSize,
 }
 
 impl<'a> FiniteField {
@@ -104,7 +114,7 @@ impl<'a> FiniteField {
         assert_ne!(G, 0, "Invalid generator");
         Self {
             prime,
-            generator: G
+            generator: G,
         }
     }
 
@@ -138,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_finite_field() {
-        let mut finite_field = FiniteField::new(97,1);
+        let finite_field = FiniteField::new(97, 1);
         let field_element1 = finite_field.element(6);
         let field_element2 = finite_field.element(3);
 
@@ -150,9 +160,9 @@ mod tests {
     #[test]
     fn test_xeuclidean() {
         let prime = 97;
-        let finite_field = FiniteField::new(prime,1);
+        let finite_field = FiniteField::new(prime, 1);
 
-        for i in 1..prime{
+        for i in 1..prime {
             let result = FiniteField::extended_euclidean(i, prime);
             assert_eq!(result.0, 1); // no gcd
 
