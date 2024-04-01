@@ -22,7 +22,7 @@ impl<'a> Polynomial<'a> {
         for (index, s) in self.coefficients.iter().rev().enumerate() {
             if *s != 0 {
                 let coeff_len = self.coefficients.len();
-                return (coeff_len - index) as u16;
+                return (coeff_len - index) as FieldSize;
             }
         }
         0
@@ -61,12 +61,12 @@ impl<'a> Div for Polynomial<'a> {
 }
 #[cfg(test)]
 mod tests {
-    use crate::finite_field::{FiniteField};
+    use crate::finite_field::{FieldSize, FiniteField};
     use crate::polynomial::Polynomial;
 
     #[test]
     fn new_polynomial() {
-        let finite_field = FiniteField::new(97u16);
+        let finite_field = FiniteField::new(97 as FieldSize, 1);
         let polynomial = Polynomial::new([2, 7, 1, 4, 0, 5].to_vec(), &finite_field);
         assert_eq!(polynomial.degree(), 6);
 
