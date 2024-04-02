@@ -1,11 +1,11 @@
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Sub, Mul, Div, Neg};
+use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div, Neg};
 
 pub type FieldSize = i32;
 
 #[derive(Debug, Copy, Clone)]
 pub struct FieldElement<'a> {
-    element: FieldSize,
+    pub(crate) element: FieldSize,
     finite_field: &'a FiniteField,
 }
 
@@ -35,7 +35,16 @@ impl<'a> Add for FieldElement<'a> {
     fn add(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
-            element: self.element + rhs.element,
+            element: (self.element + rhs.element) % self.finite_field.prime,
+            finite_field: self.finite_field,
+        }
+    }
+}
+
+impl<'a> AddAssign for FieldElement<'a> {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = Self {
+            element: (self.element + rhs.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
     }
@@ -46,7 +55,17 @@ impl<'a> Sub for FieldElement<'a> {
     fn sub(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
-            element: self.element - rhs.element,
+            element: (self.element - rhs.element) % self.finite_field.prime,
+            finite_field: self.finite_field,
+        }
+    }
+}
+
+
+impl<'a> SubAssign for FieldElement<'a> {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = Self {
+            element: (self.element - rhs.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
     }
@@ -58,7 +77,7 @@ impl<'a> Mul for FieldElement<'a> {
     fn mul(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
-            element: (self.element * rhs.element) % self.finite_field.prime,
+            element: (&self.element * &rhs.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
     }
@@ -100,6 +119,10 @@ impl<'a> FieldElement<'a> {
             element: inv % self.finite_field.prime,
             finite_field: self.finite_field,
         }
+    }
+
+    pub fn value(&self) -> FieldSize {
+        self.element % self.finite_field.prime
     }
 }
 
