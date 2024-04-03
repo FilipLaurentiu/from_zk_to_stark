@@ -153,6 +153,16 @@ impl<'a> Sub for Polynomial<'a> {
     }
 }
 
+impl<'a> Sub for &Polynomial<'a> {
+    type Output = Polynomial<'a>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.finite_field.prime, rhs.finite_field.prime, "Elements of different finite field");
+        let res = self + &rhs.neg();
+        res
+    }
+}
+
 impl<'a> Div for Polynomial<'a> {
     type Output = (Polynomial<'a>, Polynomial<'a>);
     fn div(self, rhs: Polynomial<'a>) -> Self::Output {
@@ -192,6 +202,17 @@ impl<'a> Neg for Polynomial<'a> {
 
     fn neg(self) -> Self::Output {
         Self {
+            coefficients: self.coefficients.iter().map(|x| x.neg()).collect(),
+            finite_field: self.finite_field,
+        }
+    }
+}
+
+impl<'a> Neg for &Polynomial<'a> {
+    type Output = Polynomial<'a>;
+
+    fn neg(self) -> Self::Output {
+        Polynomial {
             coefficients: self.coefficients.iter().map(|x| x.neg()).collect(),
             finite_field: self.finite_field,
         }
@@ -265,17 +286,16 @@ impl<'a> Polynomial<'a> {
     }
 
     pub fn lagrange_interpolation(points: &[(FieldElement<'a>, FieldElement<'a>)], finite_field: &'a FiniteField) -> Self {
-        let x = Polynomial::from_slice(&[0, 1], finite_field);
+        let x = &Polynomial::from_slice(&[0, 1], finite_field);
         let mut acc = Polynomial::new(Vec::new(), finite_field);
         for (i, i_element) in points.iter().enumerate() {
             let mut value = Polynomial::new([i_element.1].to_vec(), finite_field);
             for (j, j_element) in points.iter().enumerate() {
                 if i == j { continue; }
-                let basis = &(x.clone() - Polynomial::new([j_element.0].to_vec(), finite_field)) * &Polynomial::new([(i_element.0 - j_element.0).inverse()].to_vec(), finite_field);
-                value = &value * &basis;
+                let basis = (x - &Polynomial::new([j_element.0].to_vec(), finite_field)) * Polynomial::new([(i_element.0 - j_element.0).inverse()].to_vec(), finite_field);
+                value = value * basis;
             }
-            acc = &acc + &value;
-
+            acc = acc + value;
         }
         acc
     }
@@ -374,7 +394,7 @@ mod tests {
         let p = Polynomial::lagrange_interpolation(&points, &finite_field);
         let expected = Polynomial::from_slice(&[11, 43, 50], &finite_field);
         assert_eq!(&p, &expected);
-        
+
         assert_eq!(p.evaluate(&points[0].0), points[0].1);
         assert_eq!(p.evaluate(&points[1].0), points[1].1);
         assert_eq!(p.evaluate(&points[2].0), points[2].1);
