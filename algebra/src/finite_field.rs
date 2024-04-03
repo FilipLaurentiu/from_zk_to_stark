@@ -54,8 +54,12 @@ impl<'a> Sub for FieldElement<'a> {
     type Output = FieldElement<'a>;
     fn sub(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
+        let mut res = (self.element - rhs.element) % self.finite_field.prime;
+        if res.is_negative() {
+            res = self.finite_field.prime + (res % self.finite_field.prime);
+        }
         Self {
-            element: (self.element - rhs.element) % self.finite_field.prime,
+            element: res,
             finite_field: self.finite_field,
         }
     }
