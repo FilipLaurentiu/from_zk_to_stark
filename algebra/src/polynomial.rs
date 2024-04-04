@@ -344,6 +344,15 @@ impl<'a> Polynomial<'a> {
         }
         result
     }
+
+    pub fn zerofier_domain(domain: FieldSize, finite_field: &'a FiniteField) -> Self {
+        let x = Polynomial::new(vec![finite_field.zero(), finite_field.one()], finite_field);
+        let mut acc = Polynomial::new(vec![finite_field.one()], finite_field);
+        for i in 0..domain {
+            acc = &acc * &(&x - &Polynomial::new(vec![finite_field.element(i)], finite_field));
+        }
+        acc
+    }
 }
 
 #[cfg(test)]
@@ -460,5 +469,17 @@ mod tests {
         assert_eq!(evaluation_on_domain[1], points[0].1);
         assert_eq!(evaluation_on_domain[2], points[1].1);
         assert_eq!(evaluation_on_domain[3], points[2].1);
+    }
+
+    #[test]
+    fn test_zerofier_polynomial() {
+        let finite_field = FiniteField::new(97, 1);
+
+        let domain = 7;
+        let p = Polynomial::zerofier_domain(domain, &finite_field);
+
+        for i in 0..domain {
+            assert_eq!(p.evaluate(finite_field.element(i)), finite_field.zero());
+        }
     }
 }

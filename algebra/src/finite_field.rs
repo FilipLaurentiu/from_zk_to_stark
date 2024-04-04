@@ -151,7 +151,7 @@ pub struct FiniteField {
     pub generator: FieldSize,
 }
 
-impl<'a> FiniteField {
+impl FiniteField {
     pub fn new(prime: FieldSize, G: FieldSize) -> Self {
         assert_ne!(G, 0, "Invalid generator");
         Self {
