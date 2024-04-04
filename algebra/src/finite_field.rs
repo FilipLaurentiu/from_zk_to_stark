@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div, Neg};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
 pub type FieldSize = i32;
 
@@ -65,7 +65,6 @@ impl<'a> Sub for FieldElement<'a> {
     }
 }
 
-
 impl<'a> SubAssign for FieldElement<'a> {
     fn sub_assign(&mut self, rhs: Self) {
         *self = Self {
@@ -87,12 +86,28 @@ impl<'a> Mul for FieldElement<'a> {
     }
 }
 
+impl<'a> Mul for &FieldElement<'a> {
+    type Output = FieldElement<'a>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.finite_field, rhs.finite_field);
+        FieldElement {
+            element: (self.element * rhs.element) % self.finite_field.prime,
+            finite_field: self.finite_field,
+        }
+    }
+}
+
 impl<'a> Div for FieldElement<'a> {
     type Output = FieldElement<'a>;
 
     fn div(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
-        assert_ne!(rhs, self.finite_field.zero(), "Division by zero is not allowed");
+        assert_ne!(
+            rhs,
+            self.finite_field.zero(),
+            "Division by zero is not allowed"
+        );
         Self {
             element: (self.element * rhs.inverse().element) % self.finite_field.prime,
             finite_field: self.finite_field,
@@ -152,7 +167,9 @@ impl<'a> FiniteField {
         }
     }
 
-    pub fn zero(&self) -> FieldElement { self.element(0) }
+    pub fn zero(&self) -> FieldElement {
+        self.element(0)
+    }
     pub fn one(&self) -> FieldElement {
         self.element(1)
     }
@@ -171,7 +188,7 @@ impl<'a> FiniteField {
 
 #[cfg(test)]
 mod tests {
-    use super::{FiniteField};
+    use super::FiniteField;
 
     #[test]
     fn test_finite_field() {
