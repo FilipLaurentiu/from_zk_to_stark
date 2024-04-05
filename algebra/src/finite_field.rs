@@ -1,3 +1,4 @@
+use rand::random;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
@@ -35,6 +36,18 @@ impl<'a> Add for FieldElement<'a> {
     fn add(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
+            element: (self.element + rhs.element) % self.finite_field.prime,
+            finite_field: self.finite_field,
+        }
+    }
+}
+
+impl<'a> Add for &FieldElement<'a> {
+    type Output = FieldElement<'a>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.finite_field, rhs.finite_field);
+        FieldElement {
             element: (self.element + rhs.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
@@ -183,6 +196,11 @@ impl FiniteField {
         let x = y1 - (b / a) * x1;
         let y = x1;
         (gcd, x, y) // ax + by = gcd(a, b)
+    }
+
+    pub fn random_element(&self) -> FieldElement {
+        let random = random();
+        self.element(random)
     }
 }
 
