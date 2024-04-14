@@ -16,8 +16,8 @@ Building a STARK protocol from scratch for learning.
         - [x] Evaluation
         - [x] Lagrange interpolation
 - Crypto primitives
-    - [] Hash
-    - [] Merkle Trees
+    - [] Hash - In progress
+    - [] Merkle Trees - In progress
     - [] Fiat-Shamir
     - [] FRI
 - ... 

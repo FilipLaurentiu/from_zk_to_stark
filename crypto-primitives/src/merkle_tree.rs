@@ -1,20 +1,20 @@
 use crate::hash::Hasher;
 use algebra::finite_field::{FieldElement, FiniteField};
 
-struct MerkleTree<'a, 'b, H: Hasher> {
+struct MerkleTree<'a, H: Hasher<'a>> {
     finite_field: &'a FiniteField,
-    hasher: &'b H,
+    hasher: &'a H,
 }
 
-impl<'a, 'b, H: Hasher> MerkleTree<'a, 'b, H> {
+impl<'a, H: Hasher<'a>> MerkleTree<'a, H> {
     /// computes the Merkle root of a given array.
-    pub fn new(finite_field: &'a FiniteField, hasher: &'b H) -> Self {
+    pub fn new(finite_field: &'a FiniteField, hasher: &'a H) -> Self {
         MerkleTree {
             finite_field,
             hasher,
         }
     }
-    pub fn commit(&self, leafs: &'a [FieldElement]) -> FieldElement {
+    pub fn commit(&self, leafs: &'a [FieldElement<'a>]) -> FieldElement<'a> {
         let leafs_len = leafs.len();
         assert!(leafs_len != 0 && (leafs_len & (leafs_len - 1)) == 0);
         if leafs_len == 1 {
@@ -52,10 +52,10 @@ impl<'a, 'b, H: Hasher> MerkleTree<'a, 'b, H> {
     ///  verifies that a given leaf is an element of the committed vector at the given index
     pub fn verify(
         &self,
-        root: &FieldElement,
+        root: &FieldElement<'a>,
         index: usize,
-        path: &[FieldElement],
-        leaf: FieldElement,
+        path: &[FieldElement<'a>],
+        leaf: FieldElement<'a>,
     ) -> bool {
         assert!(index < (1 << path.len()));
 

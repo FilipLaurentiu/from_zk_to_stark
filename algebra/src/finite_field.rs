@@ -2,7 +2,7 @@ use rand::random;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
-pub type FieldSize = i32;
+pub type FieldSize = i128;
 
 #[derive(Debug, Copy, Clone)]
 pub struct FieldElement<'a> {
@@ -155,6 +155,14 @@ impl<'a> FieldElement<'a> {
 
     pub fn value(&self) -> FieldSize {
         self.element % self.finite_field.prime
+    }
+
+    pub fn pow(&self, y: &FieldElement) -> FieldElement {
+        let mut result = *self;
+        for _i in 0..y.element {
+            result = result * result;
+        }
+        result
     }
 }
 

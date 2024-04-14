@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 algebra = { path = "../algebra" }
+ndarray = "0.15.6"
+ndarray-linalg = { version = "0.16.0", features = ["intel-mkl-static"] }
