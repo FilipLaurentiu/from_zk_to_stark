@@ -22,11 +22,7 @@ impl<'a> PartialEq for FieldElement<'a> {
 
 impl<'a> Display for FieldElement<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.element.is_positive() {
-            write!(f, "{}", self.element % self.finite_field.prime)
-        } else {
-            write!(f, "{}", self.finite_field.prime - self.element)
-        }
+        write!(f, "{}", self.element)
     }
 }
 
@@ -36,9 +32,10 @@ impl<'a> Add for FieldElement<'a> {
     fn add(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
-            element: (self.element + rhs.element) % self.finite_field.prime,
+            element: self.element + rhs.element,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 }
 
@@ -48,18 +45,21 @@ impl<'a> Add for &FieldElement<'a> {
     fn add(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         FieldElement {
-            element: (self.element + rhs.element) % self.finite_field.prime,
+            element: self.element + rhs.element,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 }
 
 impl<'a> AddAssign for FieldElement<'a> {
     fn add_assign(&mut self, rhs: Self) {
+        assert_eq!(self.finite_field, rhs.finite_field);
         *self = Self {
-            element: (self.element + rhs.element) % self.finite_field.prime,
+            element: self.element + rhs.element,
             finite_field: self.finite_field,
         }
+        .abs();
     }
 }
 
@@ -67,14 +67,8 @@ impl<'a> Sub for FieldElement<'a> {
     type Output = FieldElement<'a>;
     fn sub(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
-        let mut res = (self.element - rhs.element) % self.finite_field.prime;
-        if res.is_negative() {
-            res = self.finite_field.prime + (res % self.finite_field.prime);
-        }
-        Self {
-            element: res,
-            finite_field: self.finite_field,
-        }
+        let res = self.abs() - rhs.abs();
+        res.abs()
     }
 }
 
@@ -84,6 +78,7 @@ impl<'a> SubAssign for FieldElement<'a> {
             element: (self.element - rhs.element) % self.finite_field.prime,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 }
 
@@ -93,9 +88,10 @@ impl<'a> Mul for FieldElement<'a> {
     fn mul(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
-            element: (&self.element * &rhs.element) % self.finite_field.prime,
+            element: self.abs().element * rhs.abs().element,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 }
 
@@ -105,9 +101,10 @@ impl<'a> Mul for &FieldElement<'a> {
     fn mul(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         FieldElement {
-            element: (self.element * rhs.element) % self.finite_field.prime,
+            element: self.abs().element * rhs.abs().element,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 }
 
@@ -121,10 +118,7 @@ impl<'a> Div for FieldElement<'a> {
             self.finite_field.zero(),
             "Division by zero is not allowed"
         );
-        Self {
-            element: (self.element * rhs.inverse().element) % self.finite_field.prime,
-            finite_field: self.finite_field,
-        }
+        self * rhs.inverse()
     }
 }
 
@@ -133,7 +127,7 @@ impl<'a> Neg for FieldElement<'a> {
 
     fn neg(self) -> Self::Output {
         Self {
-            element: (self.finite_field.prime - self.element) % self.finite_field.prime,
+            element: self.finite_field.prime - self.element,
             finite_field: self.finite_field,
         }
     }
@@ -145,16 +139,17 @@ impl<'a> FieldElement<'a> {
         let inv = if xgcd.1.is_negative() {
             self.finite_field.prime + xgcd.1
         } else {
-            xgcd.1
+            xgcd.1.abs()
         };
         Self {
             element: inv % self.finite_field.prime,
             finite_field: self.finite_field,
         }
+        .abs()
     }
 
     pub fn value(&self) -> FieldSize {
-        self.element % self.finite_field.prime
+        self.abs().element
     }
 
     pub fn pow(&self, y: &FieldElement) -> FieldElement {
@@ -163,6 +158,21 @@ impl<'a> FieldElement<'a> {
             result = result * result;
         }
         result
+    }
+
+    pub fn abs(&self) -> FieldElement<'a> {
+        let value = self.element.rem_euclid(self.finite_field.prime);
+        if self.element.is_negative() {
+            return FieldElement {
+                element: value + self.finite_field.prime,
+                finite_field: self.finite_field,
+            };
+        }
+
+        FieldElement {
+            element: value,
+            finite_field: self.finite_field,
+        }
     }
 }
 
