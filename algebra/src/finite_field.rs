@@ -1,16 +1,17 @@
 use rand::random;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
+use std::rc::Rc;
 
 pub type FieldSize = i128;
 
-#[derive(Debug, Copy, Clone)]
-pub struct FieldElement<'a> {
+#[derive(Debug, Clone)]
+pub struct FieldElement {
     pub(crate) element: FieldSize,
-    finite_field: &'a FiniteField,
+    finite_field: Rc<FiniteField>,
 }
 
-impl<'a> PartialEq for FieldElement<'a> {
+impl PartialEq for FieldElement {
     fn eq(&self, other: &Self) -> bool {
         if self.finite_field.prime != other.finite_field.prime {
             false
@@ -20,96 +21,123 @@ impl<'a> PartialEq for FieldElement<'a> {
     }
 }
 
-impl<'a> Display for FieldElement<'a> {
+impl Display for FieldElement {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.element)
     }
 }
 
-impl<'a> Add for FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Add for FieldElement {
+    type Output = FieldElement;
 
     fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.finite_field, rhs.finite_field);
+        assert!(
+            Rc::ptr_eq(&self.finite_field, &rhs.finite_field),
+            "Cannot add elements from different finite fields"
+        );
         Self {
             element: self.element + rhs.element,
-            finite_field: self.finite_field,
+            finite_field: Rc::clone(&self.finite_field),
         }
         .abs()
     }
 }
 
-impl<'a> Add for &FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Add for &FieldElement {
+    type Output = FieldElement;
 
     fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.finite_field, rhs.finite_field);
+        assert!(
+            Rc::ptr_eq(&self.finite_field, &rhs.finite_field),
+            "Cannot add elements from different finite fields"
+        );
         FieldElement {
-            element: self.element + rhs.element,
-            finite_field: self.finite_field,
+            element: &self.element + &rhs.element,
+            finite_field: self.finite_field.clone(),
         }
         .abs()
     }
 }
 
-impl<'a> AddAssign for FieldElement<'a> {
+impl AddAssign for FieldElement {
     fn add_assign(&mut self, rhs: Self) {
         assert_eq!(self.finite_field, rhs.finite_field);
         *self = Self {
-            element: self.element + rhs.element,
-            finite_field: self.finite_field,
+            element: &self.element + &rhs.element,
+            finite_field: self.finite_field.clone(),
         }
         .abs();
     }
 }
 
-impl<'a> Sub for FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Sub for FieldElement {
+    type Output = FieldElement;
     fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.finite_field, rhs.finite_field);
-        let res = self.abs() - rhs.abs();
-        res.abs()
-    }
-}
-
-impl<'a> SubAssign for FieldElement<'a> {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self = Self {
-            element: (self.element - rhs.element) % self.finite_field.prime,
-            finite_field: self.finite_field,
+        assert!(
+            Rc::ptr_eq(&self.finite_field, &rhs.finite_field),
+            "Cannot sub elements from different finite fields"
+        );
+        Self {
+            element: self.element - rhs.element,
+            finite_field: Rc::clone(&self.finite_field),
         }
         .abs()
     }
 }
 
-impl<'a> Mul for FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Sub for &FieldElement {
+    type Output = FieldElement;
+    fn sub(self, rhs: Self) -> Self::Output {
+        assert!(
+            Rc::ptr_eq(&self.finite_field, &rhs.finite_field),
+            "Cannot sub elements from different finite fields"
+        );
+        FieldElement {
+            element: &self.element - &rhs.element,
+            finite_field: Rc::clone(&self.finite_field),
+        }
+        .abs()
+    }
+}
+
+impl SubAssign for FieldElement {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = Self {
+            element: (self.element - rhs.element) % self.finite_field.prime,
+            finite_field: self.finite_field.clone(),
+        }
+        .abs()
+    }
+}
+
+impl Mul for FieldElement {
+    type Output = FieldElement;
 
     fn mul(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         Self {
             element: self.abs().element * rhs.abs().element,
-            finite_field: self.finite_field,
+            finite_field: self.finite_field.clone(),
         }
         .abs()
     }
 }
 
-impl<'a> Mul for &FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Mul for &FieldElement {
+    type Output = FieldElement;
 
     fn mul(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
         FieldElement {
             element: self.abs().element * rhs.abs().element,
-            finite_field: self.finite_field,
+            finite_field: self.finite_field.clone(),
         }
         .abs()
     }
 }
 
-impl<'a> Div for FieldElement<'a> {
-    type Output = FieldElement<'a>;
+impl Div for FieldElement {
+    type Output = FieldElement;
 
     fn div(self, rhs: Self) -> Self::Output {
         assert_eq!(self.finite_field, rhs.finite_field);
@@ -122,18 +150,33 @@ impl<'a> Div for FieldElement<'a> {
     }
 }
 
-impl<'a> Neg for FieldElement<'a> {
+impl Div for &FieldElement {
+    type Output = FieldElement;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        assert_eq!(self.finite_field, rhs.finite_field);
+        assert_ne!(
+            rhs,
+            &self.finite_field.zero(),
+            "Division by zero is not allowed"
+        );
+
+        self * &rhs.inverse()
+    }
+}
+
+impl Neg for FieldElement {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
         Self {
             element: self.finite_field.prime - self.element,
-            finite_field: self.finite_field,
+            finite_field: self.finite_field.clone(),
         }
     }
 }
 
-impl<'a> FieldElement<'a> {
+impl FieldElement {
     pub fn inverse(&self) -> Self {
         let xgcd = FiniteField::extended_euclidean(self.element, self.finite_field.prime);
         let inv = if xgcd.1.is_negative() {
@@ -143,7 +186,7 @@ impl<'a> FieldElement<'a> {
         };
         Self {
             element: inv % self.finite_field.prime,
-            finite_field: self.finite_field,
+            finite_field: self.finite_field.clone(),
         }
         .abs()
     }
@@ -153,55 +196,55 @@ impl<'a> FieldElement<'a> {
     }
 
     pub fn pow(&self, y: &FieldElement) -> FieldElement {
-        let mut result = *self;
+        let mut result = self.clone();
         for _i in 0..y.element {
-            result = result * result;
+            result = &result * &result;
         }
         result
     }
 
-    pub fn abs(&self) -> FieldElement<'a> {
+    pub fn abs(&self) -> FieldElement {
         let value = self.element.rem_euclid(self.finite_field.prime);
         if self.element.is_negative() {
             return FieldElement {
-                element: value + self.finite_field.prime,
-                finite_field: self.finite_field,
+                element: value + &self.finite_field.prime,
+                finite_field: self.finite_field.clone(),
             };
         }
 
         FieldElement {
             element: value,
-            finite_field: self.finite_field,
+            finite_field: self.finite_field.clone(),
         }
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct FiniteField {
     pub prime: FieldSize,
     pub generator: FieldSize,
 }
 
 impl FiniteField {
-    pub fn new(prime: FieldSize, G: FieldSize) -> Self {
-        assert_ne!(G, 0, "Invalid generator");
+    pub fn new(prime: FieldSize, g: FieldSize) -> Self {
+        assert_ne!(g, 0, "Invalid generator");
         Self {
             prime,
-            generator: G,
+            generator: g,
         }
     }
 
-    pub fn element(&self, value: FieldSize) -> FieldElement {
+    pub fn element(self: &Rc<Self>, value: FieldSize) -> FieldElement {
         FieldElement {
             element: value,
-            finite_field: self,
+            finite_field: Rc::clone(self),
         }
     }
 
-    pub fn zero(&self) -> FieldElement {
+    pub fn zero(self: &Rc<Self>) -> FieldElement {
         self.element(0)
     }
-    pub fn one(&self) -> FieldElement {
+    pub fn one(self: &Rc<Self>) -> FieldElement {
         self.element(1)
     }
 
@@ -216,7 +259,7 @@ impl FiniteField {
         (gcd, x, y) // ax + by = gcd(a, b)
     }
 
-    pub fn random_element(&self) -> FieldElement {
+    pub fn random_element(self: &Rc<Self>) -> FieldElement {
         let random = random();
         self.element(random)
     }
@@ -225,22 +268,23 @@ impl FiniteField {
 #[cfg(test)]
 mod tests {
     use super::FiniteField;
+    use std::rc::Rc;
 
     #[test]
     fn test_finite_field() {
-        let finite_field = FiniteField::new(97, 1);
+        let finite_field = Rc::new(FiniteField::new(97, 1));
         let field_element1 = finite_field.element(6);
         let field_element2 = finite_field.element(3);
 
-        assert_eq!(field_element1 + field_element2, finite_field.element(9));
-        assert_eq!(field_element1 - field_element2, finite_field.element(3));
+        assert_eq!(&field_element1 + &field_element2, finite_field.element(9));
+        assert_eq!(&field_element1 - &field_element2, finite_field.element(3));
         assert_eq!(field_element1 * field_element2, finite_field.element(18));
     }
 
     #[test]
     fn test_xeuclidean() {
         let prime = 97;
-        let finite_field = FiniteField::new(prime, 1);
+        let finite_field = Rc::new(FiniteField::new(prime, 1));
 
         for i in 1..prime {
             let result = FiniteField::extended_euclidean(i, prime);
