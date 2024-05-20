@@ -1,12 +1,13 @@
 use algebra::finite_field::{FieldElement, FieldSize, FiniteField};
-use ndarray::{arr1, s, Array1, Array2, Axis};
+use ndarray::{arr1, array, s, Array1, Array2, Axis};
 use std::rc::Rc;
 
 pub trait Hasher {
     fn hash(&self, value: FieldElement) -> FieldElement;
 }
 
-struct RescueHash {
+#[derive(Clone)]
+pub struct RescueHash {
     alpha: FieldElement,
     alpha_inv: FieldElement,
     finite_field: Rc<FiniteField>,
@@ -57,6 +58,19 @@ impl Hasher for RescueHash {
         }
 
         state[0].clone()
+    }
+}
+
+impl Default for RescueHash {
+    fn default() -> Self {
+        let finite_field = Rc::new(FiniteField::new(97, 1));
+        let alpha = finite_field.element(5);
+        let mds_matrix = array![
+            [finite_field.random_element(), finite_field.random_element()],
+            [finite_field.random_element(), finite_field.random_element()],
+        ];
+        let constants = Array1::from_elem(108, finite_field.random_element());
+        RescueHash::new(Rc::clone(&finite_field), 1, 1, alpha, mds_matrix, constants)
     }
 }
 

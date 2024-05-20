@@ -2,45 +2,58 @@ use crate::hash::Hasher;
 use algebra::finite_field::{FieldElement, FiniteField};
 use std::rc::Rc;
 
-struct MerkleTree<H: Hasher> {
+struct MerkleTree<H: Hasher + Clone> {
     finite_field: Rc<FiniteField>,
     hasher: H,
+    leafs: Vec<FieldElement>,
+    levels: Vec<Vec<FieldElement>>,
 }
 
-impl<H: Hasher> MerkleTree<H> {
+impl<H: Hasher + Clone> MerkleTree<H> {
     /// computes the Merkle root of a given array.
-    pub fn new(finite_field: Rc<FiniteField>, hasher: H) -> Self {
-        MerkleTree {
-            finite_field,
-            hasher,
-        }
-    }
-
-    fn commit_inner(&self, leafs: &[FieldElement]) -> FieldElement {
-        let leafs_len = leafs.len();
-
-        return if leafs_len == 1 {
-            leafs.first().unwrap().to_owned()
-        } else {
-            let left = &leafs[..leafs_len / 2];
-            let right = &leafs[leafs_len / 2..leafs_len];
-            self.hasher.hash(self.commit(left) + self.commit(right))
-        };
-    }
-    pub fn commit(&self, leafs: &[FieldElement]) -> FieldElement {
+    pub fn new(finite_field: Rc<FiniteField>, hasher: H, leafs: Vec<FieldElement>) -> Self {
         let leafs_len = leafs.len();
         assert_ne!(leafs_len, 0, "The list doesn't contains any elements");
-        assert_eq!(
-            (leafs_len & (leafs_len - 1)),
-            0,
-            "The list is not power of 2"
-        );
+        assert_eq!(leafs_len & (leafs_len - 1), 0, "The list is not power of 2");
 
-        let hashed_leafs = leafs
-            .into_iter()
-            .map(|leaf| self.hasher.hash(leaf.clone()))
-            .collect::<Vec<FieldElement>>();
-        return self.commit_inner(&hashed_leafs);
+        let tree = MerkleTree {
+            finite_field,
+            hasher: hasher.clone(),
+            leafs: leafs
+                .iter()
+                .map(|leaf| hasher.hash(leaf.clone()))
+                .collect::<Vec<FieldElement>>(),
+            levels: vec![],
+        };
+        tree
+    }
+
+    pub fn commit(&mut self) -> FieldElement {
+        let mut curr_level = self.leafs.clone();
+
+        while curr_level.len() > 1 {
+            let odd_leafs = curr_level
+                .clone()
+                .into_iter()
+                .step_by(2)
+                .collect::<Vec<FieldElement>>();
+            let even_leafs = curr_level
+                .clone()
+                .into_iter()
+                .skip(1)
+                .step_by(2)
+                .collect::<Vec<FieldElement>>();
+
+            let parents = odd_leafs
+                .iter()
+                .zip(even_leafs.iter())
+                .map(|(left, right)| self.hasher.hash(left + right))
+                .collect::<Vec<FieldElement>>();
+            self.levels.push(parents.clone());
+            curr_level = parents;
+        }
+
+        curr_level.first().unwrap().clone()
     }
 
     /// computes the authentication path of an indicated leaf in the Merkle tree.
@@ -57,11 +70,11 @@ impl<H: Hasher> MerkleTree<H> {
             vec![leafs[leafs_len - index - 1].clone()]
         } else if index_is_less_than_half {
             let mut auth_path = self.open(index, &leafs[..half_leafs_len]);
-            auth_path.push(self.commit(&leafs[half_leafs_len..]));
+            //auth_path.push(self.commit(&leafs[half_leafs_len..]));
             auth_path.to_owned()
         } else {
             let mut auth_path = self.open(index - half_leafs_len, &leafs[half_leafs_len..]);
-            auth_path.push(self.commit(&leafs[..half_leafs_len]));
+            // auth_path.push(self.commit(&leafs[..half_leafs_len]));
             auth_path.to_owned()
         }
     }
@@ -99,5 +112,33 @@ impl<H: Hasher> MerkleTree<H> {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::hash::RescueHash;
+    use crate::merkle_tree::MerkleTree;
+    use algebra::finite_field::FiniteField;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_create_merkle_tree() {
+        let finite_field = Rc::new(FiniteField::new(97, 1));
+        let hasher = RescueHash::default();
+        let leafs = vec![
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+            finite_field.random_element(),
+        ];
+        let mut tree = MerkleTree::new(Rc::clone(&finite_field), hasher, leafs);
+        let root = tree.commit();
+        assert_eq!(tree.levels.len(), tree.leafs.len().ilog2() as usize);
+        println!("Root: {}", root);
     }
 }

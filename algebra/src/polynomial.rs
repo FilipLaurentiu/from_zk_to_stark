@@ -190,11 +190,9 @@ impl Div for Polynomial {
     fn div(self, rhs: Polynomial) -> Self::Output {
         let mut dividend = self.clone();
 
-        let mut result_coefficients: Vec<FieldElement> =
-            vec![
-                self.finite_field.zero();
-                dividend.coefficients.len() - rhs.coefficients.len() + 1
-            ];
+        let result_len = dividend.coefficients.len() - rhs.coefficients.len() + 1;
+
+        let mut result_coefficients: Vec<FieldElement> = vec![self.finite_field.zero(); result_len];
 
         let leading_coeff_index_rhs = rhs.leading_coefficient_index();
         let leading_coeff_rhs = rhs.coefficients[leading_coeff_index_rhs].element;
