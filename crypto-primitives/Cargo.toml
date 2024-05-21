@@ -9,3 +9,4 @@ edition = "2021"
 algebra = { path = "../algebra" }
 ndarray = "0.15.6"
 ndarray-linalg = { version = "0.16.0", features = ["intel-mkl-static"] }
+rand = "0.8.5"

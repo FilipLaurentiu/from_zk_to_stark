@@ -8,6 +8,7 @@ struct MerkleTree<H: Hasher + Clone> {
     hasher: H,
     leafs: Vec<FieldElement>,
     levels: Vec<Vec<FieldElement>>,
+    root: Option<FieldElement>,
 }
 
 impl<H: Hasher + Clone> MerkleTree<H> {
@@ -22,13 +23,13 @@ impl<H: Hasher + Clone> MerkleTree<H> {
             .map(|leaf| hasher.hash(leaf.clone()))
             .collect::<Vec<FieldElement>>();
 
-        let tree = MerkleTree {
+        MerkleTree {
             finite_field,
             hasher: hasher.clone(),
             leafs: leafs.clone(),
             levels: vec![leafs],
-        };
-        tree
+            root: None,
+        }
     }
 
     pub fn commit(&mut self) -> FieldElement {
@@ -56,6 +57,7 @@ impl<H: Hasher + Clone> MerkleTree<H> {
             curr_level = parents;
         }
 
+        self.root = Some(curr_level.last().unwrap().clone());
         curr_level.first().unwrap().clone()
     }
 
@@ -63,38 +65,25 @@ impl<H: Hasher + Clone> MerkleTree<H> {
     pub fn prove(&self, element: FieldElement) -> Option<Vec<FieldElement>> {
         let mut current_level_index = 0usize;
 
-        let mut result: Vec<FieldElement> = vec![];
+        let mut result: Vec<FieldElement> = vec![element.clone()];
         let mut element = element;
 
-        while current_level_index < self.levels.len() {
-            let current_level = &self.levels[current_level_index];
+        let mut current_level = &self.levels[current_level_index];
 
-            if current_level.len() == 1 {
-                assert_eq!(element, current_level.first().unwrap().clone());
-                result.push(element.clone());
-                return Some(result);
-            } else {
-                match current_level.iter().position(|x| *x == element) {
-                    Some(element_index) => {
-                        let sibling;
-                        if element_index % 2 == 0 {
-                            sibling = current_level.index(element_index + 1);
-                            result.push(element.clone());
-                            result.push(sibling.clone());
-                        } else {
-                            sibling = current_level.index(element_index - 1);
-                            result.push(sibling.clone());
-                            result.push(element.clone());
-                        };
-                        element = self.hasher.hash(sibling.clone() + element);
-
-                        current_level_index += 1;
-                    }
-
-                    None => {
-                        return None;
-                    }
+        while current_level_index < self.levels.len() - 1 {
+            match current_level.iter().position(|x| *x == element) {
+                Some(element_index) => {
+                    let sibling = if element_index % 2 == 0 {
+                        current_level.index(element_index + 1)
+                    } else {
+                        current_level.index(element_index - 1)
+                    };
+                    result.push(sibling.clone());
+                    element = self.hasher.hash(sibling.clone() + element);
+                    current_level_index += 1;
+                    current_level = &self.levels[current_level_index];
                 }
+                None => return None,
             }
         }
 
@@ -102,38 +91,17 @@ impl<H: Hasher + Clone> MerkleTree<H> {
     }
 
     ///  verifies that a given leaf is an element of the committed vector at the given index
-    pub fn verify(
-        &self,
-        root: &FieldElement,
-        index: usize,
-        path: &[FieldElement],
-        leaf: FieldElement,
-    ) -> bool {
-        assert!(index < (1 << path.len()));
-
-        if path.len() == 1 {
-            if index == 0 {
-                return root == &self.hasher.hash(leaf + path[0].clone());
-            } else {
-                return root == &self.hasher.hash(path[0].clone() + leaf);
-            }
-        } else {
-            if index % 2 == 0 {
-                return self.verify(
-                    root,
-                    index >> 1,
-                    &path[1..],
-                    self.hasher.hash(leaf + path[0].clone()),
-                );
-            } else {
-                return self.verify(
-                    root,
-                    index >> 1,
-                    &path[1..],
-                    self.hasher.hash(path[0].clone() + leaf),
-                );
-            }
+    pub fn verify(&self, proof: Vec<FieldElement>) -> bool {
+        let mut current_element = proof[0].clone();
+        let mut index = 1;
+        while index < proof.len() {
+            current_element = self
+                .hasher
+                .hash(current_element.clone() + proof[index].clone());
+            index += 1;
         }
+
+        current_element == self.root.clone().unwrap()
     }
 }
 
@@ -142,6 +110,7 @@ mod tests {
     use crate::hash::{Hasher, RescueHash};
     use crate::merkle_tree::MerkleTree;
     use algebra::finite_field::FiniteField;
+    use rand::random;
     use std::rc::Rc;
 
     #[test]
@@ -150,16 +119,18 @@ mod tests {
         let hasher = RescueHash::default();
 
         let element = finite_field.random_element();
-        let leafs = vec![
+        let mut leafs = vec![
             finite_field.random_element(),
             finite_field.random_element(),
             finite_field.random_element(),
-            element.clone(),
+            finite_field.random_element(),
             finite_field.random_element(),
             finite_field.random_element(),
             finite_field.random_element(),
             finite_field.random_element(),
         ];
+        let random_index = random::<usize>() % leafs.len();
+        leafs[random_index] = element.clone();
         let mut tree = MerkleTree::new(Rc::clone(&finite_field), hasher.clone(), leafs);
         let root = tree.commit();
         assert_eq!(tree.levels.len(), tree.leafs.len().ilog2() as usize + 1);
@@ -169,5 +140,7 @@ mod tests {
         let proof = tree.prove(element_hash);
         println!("Proof: {:?}", proof);
         assert!(proof.is_some());
+
+        assert!(tree.verify(proof.unwrap()));
     }
 }
