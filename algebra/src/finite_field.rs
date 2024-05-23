@@ -197,8 +197,8 @@ impl FieldElement {
 
     pub fn pow(&self, y: &FieldElement) -> FieldElement {
         let mut result = self.clone();
-        for _i in 0..y.element {
-            result = &result * &result;
+        for _i in 0..y.element - 1 {
+            result = &result * self;
         }
         result
     }
@@ -263,6 +263,21 @@ impl FiniteField {
         let random = random();
         self.element(random)
     }
+
+    pub fn nth_root_of_unity(self: &Rc<Self>, n: FieldElement) -> Option<FieldElement> {
+        assert!(Rc::ptr_eq(&n.finite_field, self));
+        let mut felt = self.element(2);
+        let one = self.one();
+
+        while felt.element < self.prime - 1 {
+            if felt.pow(&n) == one {
+                return Some(felt);
+            }
+            felt = &felt + &one;
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +308,17 @@ mod tests {
             let field_element = finite_field.element(1);
             let field_element_inv = field_element.inverse();
             assert_eq!(field_element * field_element_inv, finite_field.one());
+        }
+    }
+
+    #[test]
+    fn test_nth_root_of_unity() {
+        let prime = 97;
+        let finite_field = Rc::new(FiniteField::new(prime, 1));
+        for n in 2..prime {
+            if let Some(root_of_unity) = finite_field.nth_root_of_unity(finite_field.element(n)) {
+                println!("First {}-th root of unity : {}", n, root_of_unity);
+            }
         }
     }
 }
